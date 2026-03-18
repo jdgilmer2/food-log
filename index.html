@@ -76,13 +76,14 @@
 
         <hr style="border-color:#243149;border-width:1px 0 0;margin:14px 0;" />
 
-        <div class="row">
+        <div class="row" style="grid-template-columns:2fr 0.7fr 1fr 1fr 1fr 1fr;">
           <div>
             <label>Food (example: "1 light & fit greek yogurt")</label>
             <input id="foodText" type="text" list="historyList" placeholder="Type food name..." />
             <datalist id="historyList"></datalist>
             <div class="hint" id="lookupHint">Lookup now prioritizes your saved foods first (best accuracy), then external fallback.</div>
           </div>
+          <div><label>Qty</label><input id="qty" type="number" min="0.1" step="0.1" value="1" /></div>
           <div><label>Calories</label><input id="cal" type="number" min="0" step="1" /></div>
           <div><label>Protein (g)</label><input id="pro" type="number" min="0" step="0.1" /></div>
           <div><label>Carbs (g)</label><input id="carb" type="number" min="0" step="0.1" /></div>
@@ -111,7 +112,7 @@
       <div style="overflow:auto;margin-top:8px;">
         <table>
           <thead>
-            <tr><th>Food</th><th class="right">Cal</th><th class="right">P</th><th class="right">C</th><th class="right">F</th><th></th></tr>
+            <tr><th>Food</th><th class="right">Qty</th><th class="right">Cal</th><th class="right">P</th><th class="right">C</th><th class="right">F</th><th></th></tr>
           </thead>
           <tbody id="tbody"></tbody>
         </table>
@@ -193,7 +194,7 @@
 
     function renderStats(){
       const t={cal:0,p:0,c:0,f:0};
-      entries.forEach(e=>{ t.cal+=n(e.calories); t.p+=n(e.protein_g); t.c+=n(e.carbs_g); t.f+=n(e.fat_g); });
+      entries.forEach(e=>{ const q=n(e.quantity||1); t.cal+=n(e.calories)*q; t.p+=n(e.protein_g)*q; t.c+=n(e.carbs_g)*q; t.f+=n(e.fat_g)*q; });
       const remCal=(targets.calories_target??0)-t.cal;
       const remP=(targets.protein_target??0)-t.p;
       const remC=targets.carbs_target==null?null:targets.carbs_target-t.c;
@@ -211,13 +212,15 @@
       $('entryCount').textContent=`${entries.length} item${entries.length===1?'':'s'}`;
       const tb=$('tbody'); tb.innerHTML='';
       entries.forEach((e)=>{
+        const q=n(e.quantity||1);
         const tr=document.createElement('tr');
         tr.innerHTML=`
           <td>${escapeHtml(e.food_name)}</td>
-          <td class="right">${round1(e.calories)}</td>
-          <td class="right">${round1(e.protein_g)}</td>
-          <td class="right">${round1(e.carbs_g)}</td>
-          <td class="right">${round1(e.fat_g)}</td>
+          <td class="right"><input type="number" min="0.1" step="0.1" value="${round1(q)}" data-qid="${e.id}" style="width:78px;padding:6px;border-radius:8px;border:1px solid #2b3547;background:#0d1628;color:var(--text);" /></td>
+          <td class="right">${round1(n(e.calories)*q)}</td>
+          <td class="right">${round1(n(e.protein_g)*q)}</td>
+          <td class="right">${round1(n(e.carbs_g)*q)}</td>
+          <td class="right">${round1(n(e.fat_g)*q)}</td>
           <td><button class="btn danger" data-del="${e.id}">Delete</button></td>`;
         tb.appendChild(tr);
       });
@@ -401,6 +404,7 @@
         user_id:user.id,
         entry_date:d(),
         food_name:name,
+        quantity: Math.max(0.1, n($('qty').value) || 1),
         calories:n($('cal').value),
         protein_g:n($('pro').value),
         carbs_g:n($('carb').value),
@@ -663,7 +667,7 @@
     });
 
     $('btnClear').addEventListener('click', ()=>{
-      $('foodText').value=''; $('cal').value=''; $('pro').value=''; $('carb').value=''; $('fat').value='';
+      $('foodText').value=''; $('qty').value='1'; $('cal').value=''; $('pro').value=''; $('carb').value=''; $('fat').value='';
       $('lookupHint').textContent='Lookup prioritizes your saved foods, then USDA, then fallback. Edit before adding if needed.';
     });
 
@@ -671,6 +675,24 @@
       const b=ev.target.closest('button[data-del]'); if(!b||!user) return;
       try { await deleteEntry(b.dataset.del); }
       catch(e){ alert(`Delete failed: ${e.message}`); }
+    });
+
+    $('tbody').addEventListener('change', async (ev)=>{
+      const inp = ev.target.closest('input[data-qid]');
+      if(!inp || !user) return;
+      const id = inp.dataset.qid;
+      const quantity = Math.max(0.1, n(inp.value) || 1);
+      inp.value = round1(quantity);
+      try {
+        const { error } = await supabase.from('food_entries').update({ quantity }).eq('id', id);
+        if(error) throw error;
+        const hit = entries.find(e => e.id === id);
+        if(hit) hit.quantity = quantity;
+        renderTable();
+        renderStats();
+      } catch (e) {
+        alert(`Update qty failed: ${e.message}`);
+      }
     });
 
     $('weightTbody').addEventListener('click', async (ev)=>{

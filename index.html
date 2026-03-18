@@ -410,15 +410,14 @@
       $('btnAdd').disabled = true;
       $('lookupHint').textContent = 'Saving...';
       try {
-        const { data, error } = await withTimeout(
-          supabase.from('food_entries').insert(row).select('*').single(),
+        const { error } = await withTimeout(
+          supabase.from('food_entries').insert(row),
           30000
         );
         if(error) throw error;
 
-        if(data) entries.push(data);
-        renderTable();
-        renderStats();
+        // Reload from DB after insert (more reliable than insert+select on some networks).
+        await loadEntries();
 
         // History should never block adding food. Fire-and-forget.
         Promise.resolve()

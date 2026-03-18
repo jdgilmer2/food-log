@@ -81,7 +81,7 @@
             <label>Food (example: "1 light & fit greek yogurt")</label>
             <input id="foodText" type="text" list="historyList" placeholder="Type food name..." />
             <datalist id="historyList"></datalist>
-            <div class="hint" id="lookupHint">Lookup pulls best guess from OpenFoodFacts. Edit before adding if needed.</div>
+            <div class="hint" id="lookupHint">Lookup now prioritizes your saved foods first (best accuracy), then external fallback.</div>
           </div>
           <div><label>Calories</label><input id="cal" type="number" min="0" step="1" /></div>
           <div><label>Protein (g)</label><input id="pro" type="number" min="0" step="0.1" /></div>
@@ -437,6 +437,24 @@
     }
 
     async function lookupFood(query){
+      // 1) Always prefer your own saved foods first.
+      const q = query.trim().toLowerCase();
+      const exact = history.find(h=>h.food_name.toLowerCase()===q);
+      const prefix = history.find(h=>h.food_name.toLowerCase().startsWith(q));
+      const contains = history.find(h=>h.food_name.toLowerCase().includes(q));
+      const local = exact || prefix || contains;
+      if(local){
+        return {
+          name: local.food_name,
+          cal: Math.round(n(local.calories)),
+          p: Math.round(n(local.protein_g)*10)/10,
+          c: Math.round(n(local.carbs_g)*10)/10,
+          f: Math.round(n(local.fat_g)*10)/10,
+          source: 'saved'
+        };
+      }
+
+      // 2) External fallback (OpenFoodFacts) if nothing saved matches.
       const url=`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10`;
       const res=await fetch(url);
       if(!res.ok) throw new Error('Lookup failed');
@@ -454,7 +472,7 @@
       let kcal,pro,carb,fat;
       if(hasServing && kcal100!=null){ const m=serving/100; kcal=n(kcal100)*m; pro=n(pro100)*m; carb=n(carb100)*m; fat=n(fat100)*m; }
       else { kcal=n(kcal100); pro=n(pro100); carb=n(carb100); fat=n(fat100); }
-      return { name:p.product_name || p.generic_name || query, cal:Math.round(kcal), p:Math.round(pro*10)/10, c:Math.round(carb*10)/10, f:Math.round(fat*10)/10 };
+      return { name:p.product_name || p.generic_name || query, cal:Math.round(kcal), p:Math.round(pro*10)/10, c:Math.round(carb*10)/10, f:Math.round(fat*10)/10, source:'openfoodfacts' };
     }
 
     async function migrateOldLocal(){
@@ -573,16 +591,27 @@
         const m = await lookupFood(q);
         $('foodText').value=m.name;
         $('cal').value=m.cal; $('pro').value=m.p; $('carb').value=m.c; $('fat').value=m.f;
-        $('lookupHint').textContent='Found match. Edit if needed, then Add.';
+        if(m.source==='saved') $('lookupHint').textContent='Matched your saved food ✅';
+        else $('lookupHint').textContent='External match found. Please sanity-check before Add.';
       } catch {
-        $('lookupHint').textContent='No reliable match. Enter manually.';
+        $('lookupHint').textContent='No reliable match. Enter manually, then Add (it will be saved for next time).';
       }
     });
 
     $('foodText').addEventListener('input', ()=>{
       const q=$('foodText').value.trim().toLowerCase();
-      const hit=history.find(h=>h.food_name.toLowerCase()===q);
-      if(hit){ $('cal').value=hit.calories??''; $('pro').value=hit.protein_g??''; $('carb').value=hit.carbs_g??''; $('fat').value=hit.fat_g??''; }
+      if(!q) return;
+      const exact = history.find(h=>h.food_name.toLowerCase()===q);
+      const prefix = history.find(h=>h.food_name.toLowerCase().startsWith(q));
+      const contains = history.find(h=>h.food_name.toLowerCase().includes(q));
+      const hit = exact || prefix || contains;
+      if(hit){
+        $('cal').value=hit.calories??'';
+        $('pro').value=hit.protein_g??'';
+        $('carb').value=hit.carbs_g??'';
+        $('fat').value=hit.fat_g??'';
+        $('lookupHint').textContent='Loaded from your saved foods ✅';
+      }
     });
 
     $('btnAdd').addEventListener('click', async ()=>{

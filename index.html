@@ -101,6 +101,10 @@
           <button class="btn" id="btnPush">Push cloud</button>
           <button class="btn" id="btnClearToken">Clear token</button>
         </div>
+        <label style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+          <input id="autoSync" type="checkbox" checked />
+          Auto-sync on changes
+        </label>
         <p class="hint" id="syncHint" style="margin-top:8px;">Cloud sync path: jdgilmer2/food-log → data/food-log.json</p>
 
         <p class="hint" style="margin-top:10px;">Local data is saved in your browser. Use cloud sync to keep work/home/phone in sync.</p>
@@ -127,6 +131,7 @@
 const $ = (id)=>document.getElementById(id);
 const stateKey = 'jamie_foodlog_v1';
 const syncTokenKey = 'jamie_foodlog_sync_token_v1';
+const autoSyncKey = 'jamie_foodlog_auto_sync_v1';
 const GITHUB_OWNER = 'jdgilmer2';
 const GITHUB_REPO = 'food-log';
 const GITHUB_PATH = 'data/food-log.json';
@@ -147,6 +152,7 @@ $('tProtein').value = S.targets.protein ?? 100;
 $('tCarbs').value = S.targets.carbs ?? '';
 $('tFat').value = S.targets.fat ?? '';
 $('syncToken').value = localStorage.getItem(syncTokenKey) || '';
+$('autoSync').checked = localStorage.getItem(autoSyncKey) !== '0';
 
 function n(v){ const x=parseFloat(v); return Number.isFinite(x)?x:0; }
 function d(){ return $('date').value || todayISO(); }
@@ -196,6 +202,29 @@ async function githubPutFile(token, contentObj, message){
   });
   if(!res.ok) throw new Error(`GitHub write failed (${res.status})`);
   return await res.json();
+}
+
+let autoSyncTimer = null;
+async function pushCloudNow(){
+  const token = getSyncToken();
+  if(!token) return;
+  setTargetsFromUI();
+  save(S);
+  await githubPutFile(token, S, `Food log sync: ${new Date().toISOString()}`);
+}
+
+function maybeAutoPush(){
+  if(!$('autoSync').checked) return;
+  if(autoSyncTimer) clearTimeout(autoSyncTimer);
+  autoSyncTimer = setTimeout(async ()=>{
+    try {
+      setSyncHint('Auto-syncing...');
+      await pushCloudNow();
+      setSyncHint('Auto-sync complete ✅');
+    } catch (e) {
+      setSyncHint(`Auto-sync failed: ${e.message}`, 'bad');
+    }
+  }, 900);
 }
 
 function renderHistory(){
@@ -322,6 +351,7 @@ $('btnAdd').addEventListener('click', ()=>{
   setTargetsFromUI();
   save(S); renderHistory(); renderStats(); renderTable();
   $('btnClear').click();
+  maybeAutoPush();
 });
 
 $('btnClear').addEventListener('click', ()=>{
@@ -333,9 +363,10 @@ $('tbody').addEventListener('click',(ev)=>{
   const b=ev.target.closest('button[data-del]'); if(!b) return;
   const idx=parseInt(b.dataset.del,10); if(!Number.isFinite(idx)) return;
   entriesFor(d()).splice(idx,1); save(S); renderStats(); renderTable();
+  maybeAutoPush();
 });
 
-['date','tCalories','tProtein','tCarbs','tFat'].forEach(id=>$(id).addEventListener('change',()=>{ setTargetsFromUI(); save(S); renderStats(); renderTable(); }));
+['date','tCalories','tProtein','tCarbs','tFat'].forEach(id=>$(id).addEventListener('change',()=>{ setTargetsFromUI(); save(S); renderStats(); renderTable(); maybeAutoPush(); }));
 
 $('btnExport').addEventListener('click', ()=>{
   const blob=new Blob([JSON.stringify(S,null,2)], {type:'application/json'});
@@ -344,9 +375,14 @@ $('btnExport').addEventListener('click', ()=>{
 
 $('importFile').addEventListener('change', async (ev)=>{
   const f=ev.target.files?.[0]; if(!f) return;
-  try{ const text=await f.text(); const obj=JSON.parse(text); S=obj; save(S); renderHistory(); renderStats(); renderTable(); alert('Import complete.'); }
+  try{ const text=await f.text(); const obj=JSON.parse(text); S=obj; save(S); renderHistory(); renderStats(); renderTable(); alert('Import complete.'); maybeAutoPush(); }
   catch{ alert('Invalid backup file.'); }
   ev.target.value='';
+});
+
+$('autoSync').addEventListener('change', ()=>{
+  localStorage.setItem(autoSyncKey, $('autoSync').checked ? '1' : '0');
+  setSyncHint($('autoSync').checked ? 'Auto-sync enabled.' : 'Auto-sync disabled.');
 });
 
 $('btnClearToken').addEventListener('click', ()=>{
@@ -392,6 +428,28 @@ $('btnPull').addEventListener('click', async ()=>{
 });
 
 renderHistory(); renderStats(); renderTable();
+
+(async function autoPullOnLoad(){
+  const token = ($('syncToken').value || '').trim();
+  if(!token || !$('autoSync').checked) return;
+  try {
+    setSyncHint('Checking cloud on load...');
+    const file = await githubGetFile(token);
+    if(!file){ setSyncHint('No cloud file yet. Add food then auto-sync will create one.'); return; }
+    const txt = decodeURIComponent(escape(atob(file.content.replace(/\n/g,''))));
+    const obj = JSON.parse(txt);
+    S = obj;
+    save(S);
+    $('tCalories').value = S.targets?.calories ?? 1500;
+    $('tProtein').value = S.targets?.protein ?? 100;
+    $('tCarbs').value = S.targets?.carbs ?? '';
+    $('tFat').value = S.targets?.fat ?? '';
+    renderHistory(); renderStats(); renderTable();
+    setSyncHint('Cloud sync loaded ✅');
+  } catch (e) {
+    setSyncHint(`Cloud load failed: ${e.message}`, 'bad');
+  }
+})();
 </script>
 </body>
 </html>

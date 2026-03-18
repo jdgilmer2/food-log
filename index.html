@@ -398,9 +398,13 @@
       };
       const { error } = await supabase.from('food_entries').insert(row);
       if(error) throw error;
-      await upsertHistory(row);
+
+      // History should never block adding food.
+      try { await upsertHistory(row); } catch (e) { console.warn('history upsert failed', e); }
+
       await loadEntries();
       $('btnClear').click();
+      $('lookupHint').textContent='Added ✅';
     }
 
     async function deleteEntry(id){
@@ -561,7 +565,10 @@
     $('btnAdd').addEventListener('click', async ()=>{
       if(!user) return alert('Please sign in first.');
       try { await addEntry(); }
-      catch(e){ alert(`Add failed: ${e.message}`); }
+      catch(e){
+        console.error('Add failed', e);
+        $('lookupHint').textContent = `Add failed: ${e.message}`;
+      }
     });
 
     $('btnClear').addEventListener('click', ()=>{

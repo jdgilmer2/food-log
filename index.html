@@ -14,7 +14,7 @@
     h1{margin:0 0 4px;font-size:1.5rem} .sub{margin:0;color:var(--muted)}
     label{font-size:.9rem;color:var(--muted);display:block;margin-bottom:6px}
     input,button{font:inherit}
-    input[type="text"],input[type="number"],input[type="date"]{width:100%;padding:10px;border-radius:10px;border:1px solid #2b3547;background:#0d1628;color:var(--text)}
+    input[type="text"],input[type="number"],input[type="date"],input[type="password"]{width:100%;padding:10px;border-radius:10px;border:1px solid #2b3547;background:#0d1628;color:var(--text)}
     .row{display:grid;grid-template-columns:1fr;gap:10px}
     @media(min-width:680px){.row{grid-template-columns:2fr 1fr 1fr 1fr 1fr}}
     .btn{border:1px solid #314056;background:#1a2640;color:var(--text);padding:10px 12px;border-radius:10px;cursor:pointer}
@@ -92,7 +92,18 @@
           <label class="btn" for="importFile" style="cursor:pointer;">Import backup</label>
           <input id="importFile" type="file" accept="application/json" style="display:none;" />
         </div>
-        <p class="hint" style="margin-top:10px;">Data is saved in your browser (localStorage).</p>
+
+        <hr style="border-color:#243149;border-width:1px 0 0;margin:12px 0;" />
+        <label>Cloud sync token (GitHub PAT with repo scope)</label>
+        <input id="syncToken" type="password" placeholder="ghp_... (stored only in this browser)" />
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          <button class="btn" id="btnPull">Pull cloud</button>
+          <button class="btn" id="btnPush">Push cloud</button>
+          <button class="btn" id="btnClearToken">Clear token</button>
+        </div>
+        <p class="hint" id="syncHint" style="margin-top:8px;">Cloud sync path: jdgilmer2/food-log → data/food-log.json</p>
+
+        <p class="hint" style="margin-top:10px;">Local data is saved in your browser. Use cloud sync to keep work/home/phone in sync.</p>
       </aside>
     </div>
 
@@ -115,6 +126,10 @@
 <script>
 const $ = (id)=>document.getElementById(id);
 const stateKey = 'jamie_foodlog_v1';
+const syncTokenKey = 'jamie_foodlog_sync_token_v1';
+const GITHUB_OWNER = 'jdgilmer2';
+const GITHUB_REPO = 'food-log';
+const GITHUB_PATH = 'data/food-log.json';
 
 function todayISO(){ const d=new Date(); return d.toISOString().slice(0,10); }
 function load(){
@@ -131,6 +146,7 @@ $('tCalories').value = S.targets.calories ?? 1500;
 $('tProtein').value = S.targets.protein ?? 100;
 $('tCarbs').value = S.targets.carbs ?? '';
 $('tFat').value = S.targets.fat ?? '';
+$('syncToken').value = localStorage.getItem(syncTokenKey) || '';
 
 function n(v){ const x=parseFloat(v); return Number.isFinite(x)?x:0; }
 function d(){ return $('date').value || todayISO(); }
@@ -141,6 +157,45 @@ function setTargetsFromUI(){
   S.targets.protein = Math.max(0, Math.round(n($('tProtein').value)));
   S.targets.carbs = $('tCarbs').value===''?null:Math.max(0, Math.round(n($('tCarbs').value)));
   S.targets.fat = $('tFat').value===''?null:Math.max(0, Math.round(n($('tFat').value)));
+}
+
+function setSyncHint(msg, cls='hint'){
+  const el = $('syncHint');
+  el.className = `hint ${cls}`;
+  el.textContent = msg;
+}
+
+function getSyncToken(){
+  const t = $('syncToken').value.trim();
+  if(t) localStorage.setItem(syncTokenKey, t);
+  return t;
+}
+
+async function githubGetFile(token){
+  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`;
+  const res = await fetch(url, { headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github+json' } });
+  if(res.status===404) return null;
+  if(!res.ok) throw new Error(`GitHub read failed (${res.status})`);
+  return await res.json();
+}
+
+async function githubPutFile(token, contentObj, message){
+  const existing = await githubGetFile(token);
+  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`;
+  const payload = {
+    message,
+    content: btoa(unescape(encodeURIComponent(JSON.stringify(contentObj, null, 2)))),
+    branch: 'main',
+  };
+  if(existing?.sha) payload.sha = existing.sha;
+
+  const res = await fetch(url, {
+    method:'PUT',
+    headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github+json' },
+    body: JSON.stringify(payload)
+  });
+  if(!res.ok) throw new Error(`GitHub write failed (${res.status})`);
+  return await res.json();
 }
 
 function renderHistory(){
@@ -292,6 +347,48 @@ $('importFile').addEventListener('change', async (ev)=>{
   try{ const text=await f.text(); const obj=JSON.parse(text); S=obj; save(S); renderHistory(); renderStats(); renderTable(); alert('Import complete.'); }
   catch{ alert('Invalid backup file.'); }
   ev.target.value='';
+});
+
+$('btnClearToken').addEventListener('click', ()=>{
+  localStorage.removeItem(syncTokenKey);
+  $('syncToken').value='';
+  setSyncHint('Token cleared from this browser.');
+});
+
+$('btnPush').addEventListener('click', async ()=>{
+  const token = getSyncToken();
+  if(!token){ setSyncHint('Enter your GitHub token first.', 'warn'); return; }
+  try{
+    setSyncHint('Pushing to cloud...');
+    setTargetsFromUI();
+    save(S);
+    await githubPutFile(token, S, `Food log sync: ${new Date().toISOString()}`);
+    setSyncHint('Cloud push complete ✅');
+  } catch (e) {
+    setSyncHint(`Push failed: ${e.message}`, 'bad');
+  }
+});
+
+$('btnPull').addEventListener('click', async ()=>{
+  const token = getSyncToken();
+  if(!token){ setSyncHint('Enter your GitHub token first.', 'warn'); return; }
+  try{
+    setSyncHint('Pulling from cloud...');
+    const file = await githubGetFile(token);
+    if(!file){ setSyncHint('No cloud file yet. Use Push cloud first.', 'warn'); return; }
+    const txt = decodeURIComponent(escape(atob(file.content.replace(/\n/g,''))));
+    const obj = JSON.parse(txt);
+    S = obj;
+    save(S);
+    $('tCalories').value = S.targets?.calories ?? 1500;
+    $('tProtein').value = S.targets?.protein ?? 100;
+    $('tCarbs').value = S.targets?.carbs ?? '';
+    $('tFat').value = S.targets?.fat ?? '';
+    renderHistory(); renderStats(); renderTable();
+    setSyncHint('Cloud pull complete ✅');
+  } catch (e) {
+    setSyncHint(`Pull failed: ${e.message}`, 'bad');
+  }
 });
 
 renderHistory(); renderStats(); renderTable();

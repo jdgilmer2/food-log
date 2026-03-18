@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jamie Food Log</title>
+  <style>
+    :root{--bg:#0b1220;--card:#111827;--line:#1f2937;--text:#e5e7eb;--muted:#9ca3af;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#08101d,#0b1220);color:var(--text)}
+    .wrap{max-width:980px;margin:0 auto;padding:18px}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px}
+    @media(min-width:940px){.grid{grid-template-columns:1.1fr .9fr}}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+    h1{margin:0 0 4px;font-size:1.5rem} .sub{margin:0;color:var(--muted)}
+    label{font-size:.9rem;color:var(--muted);display:block;margin-bottom:6px}
+    input,button{font:inherit}
+    input[type="text"],input[type="number"],input[type="date"]{width:100%;padding:10px;border-radius:10px;border:1px solid #2b3547;background:#0d1628;color:var(--text)}
+    .row{display:grid;grid-template-columns:1fr;gap:10px}
+    @media(min-width:680px){.row{grid-template-columns:2fr 1fr 1fr 1fr 1fr}}
+    .btn{border:1px solid #314056;background:#1a2640;color:var(--text);padding:10px 12px;border-radius:10px;cursor:pointer}
+    .btn.primary{background:#1d4ed8;border-color:#2563eb}
+    .btn.danger{background:#3b1118;border-color:#7f1d1d}
+    .stats{display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:8px}
+    .stat{padding:10px;border:1px solid #25324a;border-radius:10px;background:#0d1628}
+    .k{font-size:.82rem;color:var(--muted)} .v{font-size:1.15rem;font-weight:700}
+    table{width:100%;border-collapse:collapse;font-size:.94rem}
+    th,td{padding:8px;border-bottom:1px solid #243149;text-align:left;vertical-align:top}
+    th{color:var(--muted);font-weight:600}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#0f233f;border:1px solid #274671;font-size:.75rem;color:#93c5fd}
+    .right{text-align:right}
+    .hint{font-size:.85rem;color:var(--muted)}
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🍽️ Jamie Food Log</h1>
+    <p class="sub">Track daily calories + protein. Lookup tries OpenFoodFacts; your previous foods autocomplete as you type.</p>
+
+    <div class="grid" style="margin-top:12px;">
+      <section class="card">
+        <div class="row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr;">
+          <div>
+            <label>Date</label>
+            <input id="date" type="date" />
+          </div>
+          <div>
+            <label>Calorie target</label>
+            <input id="tCalories" type="number" min="0" step="1" value="1500" />
+          </div>
+          <div>
+            <label>Protein target (g)</label>
+            <input id="tProtein" type="number" min="0" step="1" value="100" />
+          </div>
+          <div>
+            <label>Carbs target (optional)</label>
+            <input id="tCarbs" type="number" min="0" step="1" placeholder="optional" />
+          </div>
+          <div>
+            <label>Fat target (optional)</label>
+            <input id="tFat" type="number" min="0" step="1" placeholder="optional" />
+          </div>
+        </div>
+
+        <hr style="border-color:#243149;border-width:1px 0 0;margin:14px 0;" />
+
+        <div class="row">
+          <div>
+            <label>Food (example: "1 light & fit greek yogurt")</label>
+            <input id="foodText" type="text" list="historyList" placeholder="Type food name..." />
+            <datalist id="historyList"></datalist>
+            <div class="hint" id="lookupHint">Tip: Press Lookup to auto-fill macros, then Add.</div>
+          </div>
+          <div><label>Calories</label><input id="cal" type="number" min="0" step="1" /></div>
+          <div><label>Protein (g)</label><input id="pro" type="number" min="0" step="0.1" /></div>
+          <div><label>Carbs (g)</label><input id="carb" type="number" min="0" step="0.1" /></div>
+          <div><label>Fat (g)</label><input id="fat" type="number" min="0" step="0.1" /></div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
+          <button class="btn" id="btnLookup">Lookup macros</button>
+          <button class="btn primary" id="btnAdd">Add food</button>
+          <button class="btn" id="btnClear">Clear fields</button>
+        </div>
+      </section>
+
+      <aside class="card">
+        <h3 style="margin:0 0 10px;">Today totals</h3>
+        <div class="stats" id="stats"></div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn" id="btnExport">Export backup</button>
+          <label class="btn" for="importFile" style="cursor:pointer;">Import backup</label>
+          <input id="importFile" type="file" accept="application/json" style="display:none;" />
+        </div>
+        <p class="hint" style="margin-top:10px;">Data is saved in your browser (localStorage).</p>
+      </aside>
+    </div>
+
+    <section class="card" style="margin-top:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <h3 style="margin:0;">Entries</h3>
+        <span class="pill" id="entryCount">0 items</span>
+      </div>
+      <div style="overflow:auto;margin-top:8px;">
+        <table>
+          <thead>
+            <tr><th>Food</th><th class="right">Cal</th><th class="right">P</th><th class="right">C</th><th class="right">F</th><th></th></tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+<script>
+const $ = (id)=>document.getElementById(id);
+const stateKey = 'jamie_foodlog_v1';
+
+function todayISO(){ const d=new Date(); return d.toISOString().slice(0,10); }
+function load(){
+  const raw=localStorage.getItem(stateKey);
+  const base={targets:{calories:1500,protein:100,carbs:null,fat:null}, days:{}, history:[]};
+  if(!raw) return base;
+  try{ return Object.assign(base, JSON.parse(raw)); }catch{ return base; }
+}
+function save(s){ localStorage.setItem(stateKey, JSON.stringify(s)); }
+
+let S = load();
+$('date').value = todayISO();
+$('tCalories').value = S.targets.calories ?? 1500;
+$('tProtein').value = S.targets.protein ?? 100;
+$('tCarbs').value = S.targets.carbs ?? '';
+$('tFat').value = S.targets.fat ?? '';
+
+function n(v){ const x=parseFloat(v); return Number.isFinite(x)?x:0; }
+function d(){ return $('date').value || todayISO(); }
+function entriesFor(day){ if(!S.days[day]) S.days[day]=[]; return S.days[day]; }
+
+function setTargetsFromUI(){
+  S.targets.calories = Math.max(0, Math.round(n($('tCalories').value)));
+  S.targets.protein = Math.max(0, Math.round(n($('tProtein').value)));
+  S.targets.carbs = $('tCarbs').value===''?null:Math.max(0, Math.round(n($('tCarbs').value)));
+  S.targets.fat = $('tFat').value===''?null:Math.max(0, Math.round(n($('tFat').value)));
+}
+
+function renderHistory(){
+  const dl=$('historyList'); dl.innerHTML='';
+  S.history.slice(0,250).forEach(h=>{
+    const o=document.createElement('option'); o.value=h.name; dl.appendChild(o);
+  });
+}
+
+function totals(day){
+  const t={cal:0,p:0,c:0,f:0};
+  entriesFor(day).forEach(e=>{ t.cal+=n(e.cal); t.p+=n(e.p); t.c+=n(e.c); t.f+=n(e.f); });
+  return t;
+}
+
+function metricClass(rem, type='max'){
+  if(type==='min') return rem<=0?'ok':(rem<=20?'warn':'bad');
+  return rem>=0?'ok':'bad';
+}
+
+function renderStats(){
+  const t=totals(d());
+  const tg=S.targets;
+  const remCal=(tg.calories??0)-t.cal;
+  const remP=(tg.protein??0)-t.p;
+  const remC=tg.carbs==null?null:tg.carbs-t.c;
+  const remF=tg.fat==null?null:tg.fat-t.f;
+
+  const cards=[
+    ['Calories', `${Math.round(t.cal)} / ${tg.calories}`, `${Math.round(remCal)} left`, metricClass(remCal,'max')],
+    ['Protein (g)', `${Math.round(t.p)} / ${tg.protein}`, `${Math.round(remP)} to goal`, metricClass(remP,'min')],
+    ['Carbs (g)', tg.carbs==null?`${Math.round(t.c)}`:`${Math.round(t.c)} / ${tg.carbs}`, remC==null?'optional target':`${Math.round(remC)} left`, remC==null?'warn':metricClass(remC,'max')],
+    ['Fat (g)', tg.fat==null?`${Math.round(t.f)}`:`${Math.round(t.f)} / ${tg.fat}`, remF==null?'optional target':`${Math.round(remF)} left`, remF==null?'warn':metricClass(remF,'max')],
+  ];
+  $('stats').innerHTML = cards.map(([k,v,s,c])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="k ${c}">${s}</div></div>`).join('');
+}
+
+function renderTable(){
+  const dayEntries=entriesFor(d());
+  $('entryCount').textContent=`${dayEntries.length} item${dayEntries.length===1?'':'s'}`;
+  const tb=$('tbody'); tb.innerHTML='';
+  dayEntries.forEach((e,idx)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td>${escapeHtml(e.name)}</td>
+      <td class="right">${round1(e.cal)}</td>
+      <td class="right">${round1(e.p)}</td>
+      <td class="right">${round1(e.c)}</td>
+      <td class="right">${round1(e.f)}</td>
+      <td><button class="btn danger" data-del="${idx}">Delete</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function round1(x){ return (Math.round(n(x)*10)/10).toString(); }
+function escapeHtml(s){ return (s||'').replace(/[&<>'"]/g,(c)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','"':'&quot;' }[c])); }
+
+function addToHistory(name, macros){
+  const clean=name.trim(); if(!clean) return;
+  S.history = S.history.filter(h=>h.name.toLowerCase()!==clean.toLowerCase());
+  S.history.unshift({name:clean, ...macros, usedAt:Date.now()});
+  if(S.history.length>500) S.history=S.history.slice(0,500);
+}
+
+$('foodText').addEventListener('input', ()=>{
+  const q=$('foodText').value.trim().toLowerCase();
+  const hit=S.history.find(h=>h.name.toLowerCase()===q);
+  if(hit){ $('cal').value=hit.cal??''; $('pro').value=hit.p??''; $('carb').value=hit.c??''; $('fat').value=hit.f??''; $('lookupHint').textContent='Loaded from your history.'; }
+});
+
+async function lookupFood(query){
+  const url=`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10`;
+  const res=await fetch(url);
+  if(!res.ok) throw new Error('Lookup failed');
+  const data=await res.json();
+  const products=data.products||[];
+  const p=products.find(x=>x.nutriments && (x.nutriments['energy-kcal_100g']||x.nutriments['energy-kcal'])) || products[0];
+  if(!p) throw new Error('No match found');
+
+  const ntr=p.nutriments||{};
+  const serving = parseFloat(ntr.serving_quantity);
+  const hasServing = Number.isFinite(serving) && serving>0;
+
+  const kcal100 = ntr['energy-kcal_100g'] ?? (ntr['energy-kcal'] ? ntr['energy-kcal'] : null);
+  const pro100  = ntr['proteins_100g'];
+  const carb100 = ntr['carbohydrates_100g'];
+  const fat100  = ntr['fat_100g'];
+
+  let kcal, pro, carb, fat;
+  if(hasServing && kcal100!=null){
+    const m=serving/100;
+    kcal = n(kcal100)*m; pro=n(pro100)*m; carb=n(carb100)*m; fat=n(fat100)*m;
+  }else{
+    kcal = n(kcal100); pro=n(pro100); carb=n(carb100); fat=n(fat100);
+  }
+
+  return {
+    name: p.product_name || p.generic_name || query,
+    cal: Math.round(kcal), p: Math.round(pro*10)/10, c: Math.round(carb*10)/10, f: Math.round(fat*10)/10,
+    source: 'OpenFoodFacts'
+  };
+}
+
+$('btnLookup').addEventListener('click', async ()=>{
+  const q=$('foodText').value.trim();
+  if(!q){ $('lookupHint').textContent='Type a food first.'; return; }
+  $('lookupHint').textContent='Looking up...';
+  try{
+    const m=await lookupFood(q);
+    $('foodText').value=m.name;
+    $('cal').value=m.cal; $('pro').value=m.p; $('carb').value=m.c; $('fat').value=m.f;
+    $('lookupHint').textContent=`Found match from ${m.source}. You can edit values before adding.`;
+  }catch(e){
+    $('lookupHint').textContent='No reliable match found. You can enter macros manually.';
+  }
+});
+
+$('btnAdd').addEventListener('click', ()=>{
+  const name=$('foodText').value.trim();
+  if(!name){ $('lookupHint').textContent='Food name required.'; return; }
+  const e={name,cal:n($('cal').value),p:n($('pro').value),c:n($('carb').value),f:n($('fat').value),at:Date.now()};
+  entriesFor(d()).push(e);
+  addToHistory(name,e);
+  setTargetsFromUI();
+  save(S); renderHistory(); renderStats(); renderTable();
+  $('btnClear').click();
+});
+
+$('btnClear').addEventListener('click', ()=>{
+  $('foodText').value=''; $('cal').value=''; $('pro').value=''; $('carb').value=''; $('fat').value='';
+  $('lookupHint').textContent='Tip: Press Lookup to auto-fill macros, then Add.';
+});
+
+$('tbody').addEventListener('click',(ev)=>{
+  const b=ev.target.closest('button[data-del]'); if(!b) return;
+  const idx=parseInt(b.dataset.del,10); if(!Number.isFinite(idx)) return;
+  entriesFor(d()).splice(idx,1); save(S); renderStats(); renderTable();
+});
+
+['date','tCalories','tProtein','tCarbs','tFat'].forEach(id=>$(id).addEventListener('change',()=>{ setTargetsFromUI(); save(S); renderStats(); renderTable(); }));
+
+$('btnExport').addEventListener('click', ()=>{
+  const blob=new Blob([JSON.stringify(S,null,2)], {type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`food-log-backup-${todayISO()}.json`; a.click(); URL.revokeObjectURL(a.href);
+});
+
+$('importFile').addEventListener('change', async (ev)=>{
+  const f=ev.target.files?.[0]; if(!f) return;
+  try{ const text=await f.text(); const obj=JSON.parse(text); S=obj; save(S); renderHistory(); renderStats(); renderTable(); alert('Import complete.'); }
+  catch{ alert('Invalid backup file.'); }
+  ev.target.value='';
+});
+
+renderHistory(); renderStats(); renderTable();
+</script>
+</body>
+</html>

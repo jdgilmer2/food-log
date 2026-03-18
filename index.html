@@ -6,60 +6,72 @@
   <title>Jamie Food Log</title>
   <style>
     :root{--bg:#0b1220;--card:#111827;--line:#1f2937;--text:#e5e7eb;--muted:#9ca3af;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
-    *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#08101d,#0b1220);color:var(--text)}
-    .wrap{max-width:980px;margin:0 auto;padding:18px}
-    .grid{display:grid;grid-template-columns:1fr;gap:14px}
-    @media(min-width:940px){.grid{grid-template-columns:1.1fr .9fr}}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#08101d,#0b1220);color:var(--text)}
+    .wrap{max-width:1050px;margin:0 auto;padding:18px}
     .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
-    h1{margin:0 0 4px;font-size:1.5rem} .sub{margin:0;color:var(--muted)}
-    label{font-size:.9rem;color:var(--muted);display:block;margin-bottom:6px}
-    input,button{font:inherit}
-    input[type="text"],input[type="number"],input[type="date"],input[type="password"]{width:100%;padding:10px;border-radius:10px;border:1px solid #2b3547;background:#0d1628;color:var(--text)}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px}
+    @media(min-width:980px){.grid{grid-template-columns:1.25fr .9fr}}
     .row{display:grid;grid-template-columns:1fr;gap:10px}
     @media(min-width:680px){.row{grid-template-columns:2fr 1fr 1fr 1fr 1fr}}
+    h1{margin:0 0 4px;font-size:1.5rem}.sub{margin:0;color:var(--muted)}
+    label{font-size:.9rem;color:var(--muted);display:block;margin-bottom:6px}
+    input,button{font:inherit}
+    input[type='text'],input[type='number'],input[type='date'],input[type='email']{width:100%;padding:10px;border-radius:10px;border:1px solid #2b3547;background:#0d1628;color:var(--text)}
     .btn{border:1px solid #314056;background:#1a2640;color:var(--text);padding:10px 12px;border-radius:10px;cursor:pointer}
     .btn.primary{background:#1d4ed8;border-color:#2563eb}
     .btn.danger{background:#3b1118;border-color:#7f1d1d}
+    .btn.ghost{background:#0d1628}
     .stats{display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:8px}
     .stat{padding:10px;border:1px solid #25324a;border-radius:10px;background:#0d1628}
     .k{font-size:.82rem;color:var(--muted)} .v{font-size:1.15rem;font-weight:700}
+    .right{text-align:right}
+    .hint{font-size:.85rem;color:var(--muted)}
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
     table{width:100%;border-collapse:collapse;font-size:.94rem}
     th,td{padding:8px;border-bottom:1px solid #243149;text-align:left;vertical-align:top}
     th{color:var(--muted);font-weight:600}
     .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#0f233f;border:1px solid #274671;font-size:.75rem;color:#93c5fd}
-    .right{text-align:right}
-    .hint{font-size:.85rem;color:var(--muted)}
-    .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>🍽️ Jamie Food Log</h1>
-    <p class="sub">Track daily calories + protein. Lookup tries OpenFoodFacts; your previous foods autocomplete as you type.</p>
+    <p class="sub">Now backed by secure cloud sync (Supabase). Sign in once and your work/home/phone stay in sync.</p>
+
+    <section class="card" style="margin-top:12px;">
+      <div id="authSignedOut">
+        <div class="row" style="grid-template-columns:2fr auto;">
+          <div>
+            <label>Email for magic-link login</label>
+            <input id="email" type="email" placeholder="you@example.com" />
+          </div>
+          <div style="display:flex;align-items:flex-end;">
+            <button class="btn primary" id="btnSendLink">Send login link</button>
+          </div>
+        </div>
+        <p class="hint" id="authHint">Use the same email on all devices. Click link in email to sign in.</p>
+      </div>
+      <div id="authSignedIn" style="display:none;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div>
+          <div class="k">Signed in as</div>
+          <div id="whoami"></div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn" id="btnMigrateLocal">Import old local data</button>
+          <button class="btn ghost" id="btnSignOut">Sign out</button>
+        </div>
+      </div>
+    </section>
 
     <div class="grid" style="margin-top:12px;">
       <section class="card">
         <div class="row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr;">
-          <div>
-            <label>Date</label>
-            <input id="date" type="date" />
-          </div>
-          <div>
-            <label>Calorie target</label>
-            <input id="tCalories" type="number" min="0" step="1" value="1500" />
-          </div>
-          <div>
-            <label>Protein target (g)</label>
-            <input id="tProtein" type="number" min="0" step="1" value="100" />
-          </div>
-          <div>
-            <label>Carbs target (optional)</label>
-            <input id="tCarbs" type="number" min="0" step="1" placeholder="optional" />
-          </div>
-          <div>
-            <label>Fat target (optional)</label>
-            <input id="tFat" type="number" min="0" step="1" placeholder="optional" />
-          </div>
+          <div><label>Date</label><input id="date" type="date" /></div>
+          <div><label>Calorie target</label><input id="tCalories" type="number" min="0" step="1" value="1500" /></div>
+          <div><label>Protein target (g)</label><input id="tProtein" type="number" min="0" step="1" value="100" /></div>
+          <div><label>Carbs target (opt)</label><input id="tCarbs" type="number" min="0" step="1" /></div>
+          <div><label>Fat target (opt)</label><input id="tFat" type="number" min="0" step="1" /></div>
         </div>
 
         <hr style="border-color:#243149;border-width:1px 0 0;margin:14px 0;" />
@@ -69,7 +81,7 @@
             <label>Food (example: "1 light & fit greek yogurt")</label>
             <input id="foodText" type="text" list="historyList" placeholder="Type food name..." />
             <datalist id="historyList"></datalist>
-            <div class="hint" id="lookupHint">Tip: Press Lookup to auto-fill macros, then Add.</div>
+            <div class="hint" id="lookupHint">Lookup pulls best guess from OpenFoodFacts. Edit before adding if needed.</div>
           </div>
           <div><label>Calories</label><input id="cal" type="number" min="0" step="1" /></div>
           <div><label>Protein (g)</label><input id="pro" type="number" min="0" step="0.1" /></div>
@@ -87,27 +99,7 @@
       <aside class="card">
         <h3 style="margin:0 0 10px;">Today totals</h3>
         <div class="stats" id="stats"></div>
-        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn" id="btnExport">Export backup</button>
-          <label class="btn" for="importFile" style="cursor:pointer;">Import backup</label>
-          <input id="importFile" type="file" accept="application/json" style="display:none;" />
-        </div>
-
-        <hr style="border-color:#243149;border-width:1px 0 0;margin:12px 0;" />
-        <label>Cloud sync token (GitHub PAT with repo scope)</label>
-        <input id="syncToken" type="password" placeholder="ghp_... (stored only in this browser)" />
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-          <button class="btn" id="btnPull">Pull cloud</button>
-          <button class="btn" id="btnPush">Push cloud</button>
-          <button class="btn" id="btnClearToken">Clear token</button>
-        </div>
-        <label style="margin-top:8px;display:flex;align-items:center;gap:8px;">
-          <input id="autoSync" type="checkbox" checked />
-          Auto-sync on changes
-        </label>
-        <p class="hint" id="syncHint" style="margin-top:8px;">Cloud sync path: jdgilmer2/food-log → data/food-log.json</p>
-
-        <p class="hint" style="margin-top:10px;">Local data is saved in your browser. Use cloud sync to keep work/home/phone in sync.</p>
+        <p class="hint" id="syncHint" style="margin-top:10px;">Cloud connected.</p>
       </aside>
     </div>
 
@@ -127,329 +119,358 @@
     </section>
   </div>
 
-<script>
-const $ = (id)=>document.getElementById(id);
-const stateKey = 'jamie_foodlog_v1';
-const syncTokenKey = 'jamie_foodlog_sync_token_v1';
-const autoSyncKey = 'jamie_foodlog_auto_sync_v1';
-const GITHUB_OWNER = 'jdgilmer2';
-const GITHUB_REPO = 'food-log';
-const GITHUB_PATH = 'data/food-log.json';
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-function todayISO(){ const d=new Date(); return d.toISOString().slice(0,10); }
-function load(){
-  const raw=localStorage.getItem(stateKey);
-  const base={targets:{calories:1500,protein:100,carbs:null,fat:null}, days:{}, history:[]};
-  if(!raw) return base;
-  try{ return Object.assign(base, JSON.parse(raw)); }catch{ return base; }
-}
-function save(s){ localStorage.setItem(stateKey, JSON.stringify(s)); }
+    const $ = (id)=>document.getElementById(id);
+    const oldLocalKey = 'jamie_foodlog_v1';
+    const todayISO = ()=> new Date().toISOString().slice(0,10);
+    const n = (v)=> { const x=parseFloat(v); return Number.isFinite(x)?x:0; };
+    const round1 = (x)=> (Math.round(n(x)*10)/10).toString();
+    const d = ()=> $('date').value || todayISO();
+    const escapeHtml = (s)=> (s||'').replace(/[&<>'"]/g,(c)=>({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[c]));
 
-let S = load();
-$('date').value = todayISO();
-$('tCalories').value = S.targets.calories ?? 1500;
-$('tProtein').value = S.targets.protein ?? 100;
-$('tCarbs').value = S.targets.carbs ?? '';
-$('tFat').value = S.targets.fat ?? '';
-$('syncToken').value = localStorage.getItem(syncTokenKey) || '';
-$('autoSync').checked = localStorage.getItem(autoSyncKey) !== '0';
+    let supabase = null;
+    let user = null;
+    let entries = [];
+    let history = [];
+    let targets = { calories_target:1500, protein_target:100, carbs_target:null, fat_target:null };
 
-function n(v){ const x=parseFloat(v); return Number.isFinite(x)?x:0; }
-function d(){ return $('date').value || todayISO(); }
-function entriesFor(day){ if(!S.days[day]) S.days[day]=[]; return S.days[day]; }
+    $('date').value = todayISO();
 
-function setTargetsFromUI(){
-  S.targets.calories = Math.max(0, Math.round(n($('tCalories').value)));
-  S.targets.protein = Math.max(0, Math.round(n($('tProtein').value)));
-  S.targets.carbs = $('tCarbs').value===''?null:Math.max(0, Math.round(n($('tCarbs').value)));
-  S.targets.fat = $('tFat').value===''?null:Math.max(0, Math.round(n($('tFat').value)));
-}
+    function setHint(msg, cls='hint'){ $('syncHint').className=`hint ${cls}`; $('syncHint').textContent=msg; }
+    function setAuthHint(msg, cls='hint'){ $('authHint').className=`hint ${cls}`; $('authHint').textContent=msg; }
 
-function setSyncHint(msg, cls='hint'){
-  const el = $('syncHint');
-  el.className = `hint ${cls}`;
-  el.textContent = msg;
-}
-
-function getSyncToken(){
-  const t = $('syncToken').value.trim();
-  if(t) localStorage.setItem(syncTokenKey, t);
-  return t;
-}
-
-async function githubGetFile(token){
-  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`;
-  const res = await fetch(url, { headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github+json' } });
-  if(res.status===404) return null;
-  if(!res.ok) throw new Error(`GitHub read failed (${res.status})`);
-  return await res.json();
-}
-
-async function githubPutFile(token, contentObj, message){
-  const existing = await githubGetFile(token);
-  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`;
-  const payload = {
-    message,
-    content: btoa(unescape(encodeURIComponent(JSON.stringify(contentObj, null, 2)))),
-    branch: 'main',
-  };
-  if(existing?.sha) payload.sha = existing.sha;
-
-  const res = await fetch(url, {
-    method:'PUT',
-    headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github+json' },
-    body: JSON.stringify(payload)
-  });
-  if(!res.ok) throw new Error(`GitHub write failed (${res.status})`);
-  return await res.json();
-}
-
-let autoSyncTimer = null;
-async function pushCloudNow(){
-  const token = getSyncToken();
-  if(!token) return;
-  setTargetsFromUI();
-  save(S);
-  await githubPutFile(token, S, `Food log sync: ${new Date().toISOString()}`);
-}
-
-function maybeAutoPush(){
-  if(!$('autoSync').checked) return;
-  if(autoSyncTimer) clearTimeout(autoSyncTimer);
-  autoSyncTimer = setTimeout(async ()=>{
-    try {
-      setSyncHint('Auto-syncing...');
-      await pushCloudNow();
-      setSyncHint('Auto-sync complete ✅');
-    } catch (e) {
-      setSyncHint(`Auto-sync failed: ${e.message}`, 'bad');
+    async function initSupabase(){
+      const confRes = await fetch('/api/config');
+      if(!confRes.ok) throw new Error('Missing /api/config');
+      const conf = await confRes.json();
+      supabase = createClient(conf.supabaseUrl, conf.supabaseAnonKey);
     }
-  }, 900);
-}
 
-function renderHistory(){
-  const dl=$('historyList'); dl.innerHTML='';
-  S.history.slice(0,250).forEach(h=>{
-    const o=document.createElement('option'); o.value=h.name; dl.appendChild(o);
-  });
-}
+    function metricClass(rem, type='max'){
+      if(type==='min') return rem<=0?'ok':(rem<=20?'warn':'bad');
+      return rem>=0?'ok':'bad';
+    }
 
-function totals(day){
-  const t={cal:0,p:0,c:0,f:0};
-  entriesFor(day).forEach(e=>{ t.cal+=n(e.cal); t.p+=n(e.p); t.c+=n(e.c); t.f+=n(e.f); });
-  return t;
-}
+    function renderStats(){
+      const t={cal:0,p:0,c:0,f:0};
+      entries.forEach(e=>{ t.cal+=n(e.calories); t.p+=n(e.protein_g); t.c+=n(e.carbs_g); t.f+=n(e.fat_g); });
+      const remCal=(targets.calories_target??0)-t.cal;
+      const remP=(targets.protein_target??0)-t.p;
+      const remC=targets.carbs_target==null?null:targets.carbs_target-t.c;
+      const remF=targets.fat_target==null?null:targets.fat_target-t.f;
+      const cards=[
+        ['Calories', `${Math.round(t.cal)} / ${targets.calories_target}`, `${Math.round(remCal)} left`, metricClass(remCal,'max')],
+        ['Protein (g)', `${Math.round(t.p)} / ${targets.protein_target}`, `${Math.round(remP)} to goal`, metricClass(remP,'min')],
+        ['Carbs (g)', targets.carbs_target==null?`${Math.round(t.c)}`:`${Math.round(t.c)} / ${targets.carbs_target}`, remC==null?'optional target':`${Math.round(remC)} left`, remC==null?'warn':metricClass(remC,'max')],
+        ['Fat (g)', targets.fat_target==null?`${Math.round(t.f)}`:`${Math.round(t.f)} / ${targets.fat_target}`, remF==null?'optional target':`${Math.round(remF)} left`, remF==null?'warn':metricClass(remF,'max')],
+      ];
+      $('stats').innerHTML = cards.map(([k,v,s,c])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="k ${c}">${s}</div></div>`).join('');
+    }
 
-function metricClass(rem, type='max'){
-  if(type==='min') return rem<=0?'ok':(rem<=20?'warn':'bad');
-  return rem>=0?'ok':'bad';
-}
+    function renderTable(){
+      $('entryCount').textContent=`${entries.length} item${entries.length===1?'':'s'}`;
+      const tb=$('tbody'); tb.innerHTML='';
+      entries.forEach((e)=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML=`
+          <td>${escapeHtml(e.food_name)}</td>
+          <td class="right">${round1(e.calories)}</td>
+          <td class="right">${round1(e.protein_g)}</td>
+          <td class="right">${round1(e.carbs_g)}</td>
+          <td class="right">${round1(e.fat_g)}</td>
+          <td><button class="btn danger" data-del="${e.id}">Delete</button></td>`;
+        tb.appendChild(tr);
+      });
+    }
 
-function renderStats(){
-  const t=totals(d());
-  const tg=S.targets;
-  const remCal=(tg.calories??0)-t.cal;
-  const remP=(tg.protein??0)-t.p;
-  const remC=tg.carbs==null?null:tg.carbs-t.c;
-  const remF=tg.fat==null?null:tg.fat-t.f;
+    function renderHistory(){
+      const dl=$('historyList'); dl.innerHTML='';
+      history.slice(0,250).forEach(h=>{ const o=document.createElement('option'); o.value=h.food_name; dl.appendChild(o); });
+    }
 
-  const cards=[
-    ['Calories', `${Math.round(t.cal)} / ${tg.calories}`, `${Math.round(remCal)} left`, metricClass(remCal,'max')],
-    ['Protein (g)', `${Math.round(t.p)} / ${tg.protein}`, `${Math.round(remP)} to goal`, metricClass(remP,'min')],
-    ['Carbs (g)', tg.carbs==null?`${Math.round(t.c)}`:`${Math.round(t.c)} / ${tg.carbs}`, remC==null?'optional target':`${Math.round(remC)} left`, remC==null?'warn':metricClass(remC,'max')],
-    ['Fat (g)', tg.fat==null?`${Math.round(t.f)}`:`${Math.round(t.f)} / ${tg.fat}`, remF==null?'optional target':`${Math.round(remF)} left`, remF==null?'warn':metricClass(remF,'max')],
-  ];
-  $('stats').innerHTML = cards.map(([k,v,s,c])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="k ${c}">${s}</div></div>`).join('');
-}
+    function bindTargetInputs(){
+      $('tCalories').value = targets.calories_target ?? 1500;
+      $('tProtein').value = targets.protein_target ?? 100;
+      $('tCarbs').value = targets.carbs_target ?? '';
+      $('tFat').value = targets.fat_target ?? '';
+    }
 
-function renderTable(){
-  const dayEntries=entriesFor(d());
-  $('entryCount').textContent=`${dayEntries.length} item${dayEntries.length===1?'':'s'}`;
-  const tb=$('tbody'); tb.innerHTML='';
-  dayEntries.forEach((e,idx)=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`
-      <td>${escapeHtml(e.name)}</td>
-      <td class="right">${round1(e.cal)}</td>
-      <td class="right">${round1(e.p)}</td>
-      <td class="right">${round1(e.c)}</td>
-      <td class="right">${round1(e.f)}</td>
-      <td><button class="btn danger" data-del="${idx}">Delete</button></td>`;
-    tb.appendChild(tr);
-  });
-}
+    async function loadTargets(){
+      const { data, error } = await supabase.from('food_targets').select('*').eq('user_id', user.id).maybeSingle();
+      if(error) throw error;
+      if(!data){
+        const seed={ user_id:user.id, calories_target:1500, protein_target:100, carbs_target:null, fat_target:null };
+        const { error: insErr } = await supabase.from('food_targets').insert(seed);
+        if(insErr) throw insErr;
+        targets = seed;
+      } else {
+        targets = data;
+      }
+      bindTargetInputs();
+    }
 
-function round1(x){ return (Math.round(n(x)*10)/10).toString(); }
-function escapeHtml(s){ return (s||'').replace(/[&<>'"]/g,(c)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','"':'&quot;' }[c])); }
+    async function saveTargets(){
+      const payload={
+        user_id:user.id,
+        calories_target:Math.max(0, Math.round(n($('tCalories').value))),
+        protein_target:Math.max(0, Math.round(n($('tProtein').value))),
+        carbs_target:$('tCarbs').value===''?null:Math.max(0, Math.round(n($('tCarbs').value))),
+        fat_target:$('tFat').value===''?null:Math.max(0, Math.round(n($('tFat').value))),
+        updated_at:new Date().toISOString(),
+      };
+      const { error } = await supabase.from('food_targets').upsert(payload, { onConflict:'user_id' });
+      if(error) throw error;
+      targets = payload;
+      renderStats();
+    }
 
-function addToHistory(name, macros){
-  const clean=name.trim(); if(!clean) return;
-  S.history = S.history.filter(h=>h.name.toLowerCase()!==clean.toLowerCase());
-  S.history.unshift({name:clean, ...macros, usedAt:Date.now()});
-  if(S.history.length>500) S.history=S.history.slice(0,500);
-}
+    async function loadEntries(){
+      const { data, error } = await supabase
+        .from('food_entries')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('entry_date', d())
+        .order('created_at', { ascending:true });
+      if(error) throw error;
+      entries = data || [];
+      renderTable();
+      renderStats();
+    }
 
-$('foodText').addEventListener('input', ()=>{
-  const q=$('foodText').value.trim().toLowerCase();
-  const hit=S.history.find(h=>h.name.toLowerCase()===q);
-  if(hit){ $('cal').value=hit.cal??''; $('pro').value=hit.p??''; $('carb').value=hit.c??''; $('fat').value=hit.f??''; $('lookupHint').textContent='Loaded from your history.'; }
-});
+    async function loadHistory(){
+      const { data, error } = await supabase
+        .from('food_history')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('last_used_at', { ascending:false })
+        .limit(300);
+      if(error) throw error;
+      history = data || [];
+      renderHistory();
+    }
 
-async function lookupFood(query){
-  const url=`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10`;
-  const res=await fetch(url);
-  if(!res.ok) throw new Error('Lookup failed');
-  const data=await res.json();
-  const products=data.products||[];
-  const p=products.find(x=>x.nutriments && (x.nutriments['energy-kcal_100g']||x.nutriments['energy-kcal'])) || products[0];
-  if(!p) throw new Error('No match found');
+    async function upsertHistory(food){
+      const exact = history.find(h => h.food_name.toLowerCase() === food.food_name.toLowerCase());
+      if(exact){
+        const { error } = await supabase.from('food_history').update({
+          calories:food.calories, protein_g:food.protein_g, carbs_g:food.carbs_g, fat_g:food.fat_g, last_used_at:new Date().toISOString()
+        }).eq('id', exact.id);
+        if(error) throw error;
+      } else {
+        const { error } = await supabase.from('food_history').insert({
+          user_id:user.id,
+          food_name:food.food_name,
+          calories:food.calories,
+          protein_g:food.protein_g,
+          carbs_g:food.carbs_g,
+          fat_g:food.fat_g,
+          last_used_at:new Date().toISOString()
+        });
+        if(error) throw error;
+      }
+      await loadHistory();
+    }
 
-  const ntr=p.nutriments||{};
-  const serving = parseFloat(ntr.serving_quantity);
-  const hasServing = Number.isFinite(serving) && serving>0;
+    async function addEntry(){
+      const name = $('foodText').value.trim();
+      if(!name) return $('lookupHint').textContent='Food name required.';
+      const row = {
+        user_id:user.id,
+        entry_date:d(),
+        food_name:name,
+        calories:n($('cal').value),
+        protein_g:n($('pro').value),
+        carbs_g:n($('carb').value),
+        fat_g:n($('fat').value),
+      };
+      const { error } = await supabase.from('food_entries').insert(row);
+      if(error) throw error;
+      await upsertHistory(row);
+      await loadEntries();
+      $('btnClear').click();
+    }
 
-  const kcal100 = ntr['energy-kcal_100g'] ?? (ntr['energy-kcal'] ? ntr['energy-kcal'] : null);
-  const pro100  = ntr['proteins_100g'];
-  const carb100 = ntr['carbohydrates_100g'];
-  const fat100  = ntr['fat_100g'];
+    async function deleteEntry(id){
+      const { error } = await supabase.from('food_entries').delete().eq('id', id);
+      if(error) throw error;
+      await loadEntries();
+    }
 
-  let kcal, pro, carb, fat;
-  if(hasServing && kcal100!=null){
-    const m=serving/100;
-    kcal = n(kcal100)*m; pro=n(pro100)*m; carb=n(carb100)*m; fat=n(fat100)*m;
-  }else{
-    kcal = n(kcal100); pro=n(pro100); carb=n(carb100); fat=n(fat100);
-  }
+    async function lookupFood(query){
+      const url=`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10`;
+      const res=await fetch(url);
+      if(!res.ok) throw new Error('Lookup failed');
+      const data=await res.json();
+      const products=data.products||[];
+      const p=products.find(x=>x.nutriments && (x.nutriments['energy-kcal_100g']||x.nutriments['energy-kcal'])) || products[0];
+      if(!p) throw new Error('No match found');
+      const ntr=p.nutriments||{};
+      const serving=parseFloat(ntr.serving_quantity);
+      const hasServing=Number.isFinite(serving)&&serving>0;
+      const kcal100 = ntr['energy-kcal_100g'] ?? ntr['energy-kcal'] ?? null;
+      const pro100=ntr['proteins_100g'];
+      const carb100=ntr['carbohydrates_100g'];
+      const fat100=ntr['fat_100g'];
+      let kcal,pro,carb,fat;
+      if(hasServing && kcal100!=null){ const m=serving/100; kcal=n(kcal100)*m; pro=n(pro100)*m; carb=n(carb100)*m; fat=n(fat100)*m; }
+      else { kcal=n(kcal100); pro=n(pro100); carb=n(carb100); fat=n(fat100); }
+      return { name:p.product_name || p.generic_name || query, cal:Math.round(kcal), p:Math.round(pro*10)/10, c:Math.round(carb*10)/10, f:Math.round(fat*10)/10 };
+    }
 
-  return {
-    name: p.product_name || p.generic_name || query,
-    cal: Math.round(kcal), p: Math.round(pro*10)/10, c: Math.round(carb*10)/10, f: Math.round(fat*10)/10,
-    source: 'OpenFoodFacts'
-  };
-}
+    async function migrateOldLocal(){
+      const raw = localStorage.getItem(oldLocalKey);
+      if(!raw) return alert('No old local data found.');
+      const old = JSON.parse(raw);
 
-$('btnLookup').addEventListener('click', async ()=>{
-  const q=$('foodText').value.trim();
-  if(!q){ $('lookupHint').textContent='Type a food first.'; return; }
-  $('lookupHint').textContent='Looking up...';
-  try{
-    const m=await lookupFood(q);
-    $('foodText').value=m.name;
-    $('cal').value=m.cal; $('pro').value=m.p; $('carb').value=m.c; $('fat').value=m.f;
-    $('lookupHint').textContent=`Found match from ${m.source}. You can edit values before adding.`;
-  }catch(e){
-    $('lookupHint').textContent='No reliable match found. You can enter macros manually.';
-  }
-});
+      const t = old.targets || {};
+      await supabase.from('food_targets').upsert({
+        user_id:user.id,
+        calories_target:t.calories ?? 1500,
+        protein_target:t.protein ?? 100,
+        carbs_target:t.carbs ?? null,
+        fat_target:t.fat ?? null,
+        updated_at:new Date().toISOString()
+      }, { onConflict:'user_id' });
 
-$('btnAdd').addEventListener('click', ()=>{
-  const name=$('foodText').value.trim();
-  if(!name){ $('lookupHint').textContent='Food name required.'; return; }
-  const e={name,cal:n($('cal').value),p:n($('pro').value),c:n($('carb').value),f:n($('fat').value),at:Date.now()};
-  entriesFor(d()).push(e);
-  addToHistory(name,e);
-  setTargetsFromUI();
-  save(S); renderHistory(); renderStats(); renderTable();
-  $('btnClear').click();
-  maybeAutoPush();
-});
+      const rows = [];
+      for(const [day, arr] of Object.entries(old.days || {})){
+        for(const e of arr){
+          rows.push({
+            user_id:user.id,
+            entry_date:day,
+            food_name:e.name || 'Food',
+            calories:n(e.cal), protein_g:n(e.p), carbs_g:n(e.c), fat_g:n(e.f),
+            created_at: e.at ? new Date(e.at).toISOString() : new Date().toISOString(),
+          });
+        }
+      }
+      if(rows.length){
+        const { error } = await supabase.from('food_entries').insert(rows);
+        if(error) throw error;
+      }
 
-$('btnClear').addEventListener('click', ()=>{
-  $('foodText').value=''; $('cal').value=''; $('pro').value=''; $('carb').value=''; $('fat').value='';
-  $('lookupHint').textContent='Tip: Press Lookup to auto-fill macros, then Add.';
-});
+      for(const h of (old.history||[]).slice(0,250)){
+        await supabase.from('food_history').insert({
+          user_id:user.id,
+          food_name:h.name,
+          calories:n(h.cal), protein_g:n(h.p), carbs_g:n(h.c), fat_g:n(h.f),
+          last_used_at: h.usedAt ? new Date(h.usedAt).toISOString() : new Date().toISOString()
+        });
+      }
 
-$('tbody').addEventListener('click',(ev)=>{
-  const b=ev.target.closest('button[data-del]'); if(!b) return;
-  const idx=parseInt(b.dataset.del,10); if(!Number.isFinite(idx)) return;
-  entriesFor(d()).splice(idx,1); save(S); renderStats(); renderTable();
-  maybeAutoPush();
-});
+      await refreshAll();
+      alert('Old local data imported to cloud.');
+    }
 
-['date','tCalories','tProtein','tCarbs','tFat'].forEach(id=>$(id).addEventListener('change',()=>{ setTargetsFromUI(); save(S); renderStats(); renderTable(); maybeAutoPush(); }));
+    async function refreshAll(){
+      await loadTargets();
+      await loadHistory();
+      await loadEntries();
+    }
 
-$('btnExport').addEventListener('click', ()=>{
-  const blob=new Blob([JSON.stringify(S,null,2)], {type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`food-log-backup-${todayISO()}.json`; a.click(); URL.revokeObjectURL(a.href);
-});
+    async function afterSignIn(sessionUser){
+      user = sessionUser;
+      $('authSignedOut').style.display='none';
+      $('authSignedIn').style.display='flex';
+      $('whoami').textContent = user.email;
+      setHint('Cloud connected ✅');
+      await refreshAll();
+    }
 
-$('importFile').addEventListener('change', async (ev)=>{
-  const f=ev.target.files?.[0]; if(!f) return;
-  try{ const text=await f.text(); const obj=JSON.parse(text); S=obj; save(S); renderHistory(); renderStats(); renderTable(); alert('Import complete.'); maybeAutoPush(); }
-  catch{ alert('Invalid backup file.'); }
-  ev.target.value='';
-});
+    async function boot(){
+      try {
+        await initSupabase();
+      } catch (e) {
+        setAuthHint('Config missing. Check /api/config and env vars.', 'bad');
+        return;
+      }
 
-$('autoSync').addEventListener('change', ()=>{
-  localStorage.setItem(autoSyncKey, $('autoSync').checked ? '1' : '0');
-  setSyncHint($('autoSync').checked ? 'Auto-sync enabled.' : 'Auto-sync disabled.');
-});
+      const { data:{ session } } = await supabase.auth.getSession();
+      if(session?.user) await afterSignIn(session.user);
 
-$('btnClearToken').addEventListener('click', ()=>{
-  localStorage.removeItem(syncTokenKey);
-  $('syncToken').value='';
-  setSyncHint('Token cleared from this browser.');
-});
+      supabase.auth.onAuthStateChange(async (_event, session)=>{
+        if(session?.user){ await afterSignIn(session.user); }
+        else {
+          user = null;
+          $('authSignedOut').style.display='block';
+          $('authSignedIn').style.display='none';
+          entries=[]; history=[]; renderTable(); renderHistory(); renderStats();
+        }
+      });
+    }
 
-$('btnPush').addEventListener('click', async ()=>{
-  const token = getSyncToken();
-  if(!token){ setSyncHint('Enter your GitHub token first.', 'warn'); return; }
-  try{
-    setSyncHint('Pushing to cloud...');
-    setTargetsFromUI();
-    save(S);
-    await githubPutFile(token, S, `Food log sync: ${new Date().toISOString()}`);
-    setSyncHint('Cloud push complete ✅');
-  } catch (e) {
-    setSyncHint(`Push failed: ${e.message}`, 'bad');
-  }
-});
+    $('btnSendLink').addEventListener('click', async ()=>{
+      const email = $('email').value.trim();
+      if(!email) return setAuthHint('Enter email first.', 'warn');
+      try {
+        const redirectTo = window.location.origin;
+        const { error } = await supabase.auth.signInWithOtp({ email, options:{ emailRedirectTo: redirectTo } });
+        if(error) throw error;
+        setAuthHint('Magic link sent. Open email and click it on this device.', 'ok');
+      } catch (e) {
+        setAuthHint(`Login link failed: ${e.message}`, 'bad');
+      }
+    });
 
-$('btnPull').addEventListener('click', async ()=>{
-  const token = getSyncToken();
-  if(!token){ setSyncHint('Enter your GitHub token first.', 'warn'); return; }
-  try{
-    setSyncHint('Pulling from cloud...');
-    const file = await githubGetFile(token);
-    if(!file){ setSyncHint('No cloud file yet. Use Push cloud first.', 'warn'); return; }
-    const txt = decodeURIComponent(escape(atob(file.content.replace(/\n/g,''))));
-    const obj = JSON.parse(txt);
-    S = obj;
-    save(S);
-    $('tCalories').value = S.targets?.calories ?? 1500;
-    $('tProtein').value = S.targets?.protein ?? 100;
-    $('tCarbs').value = S.targets?.carbs ?? '';
-    $('tFat').value = S.targets?.fat ?? '';
-    renderHistory(); renderStats(); renderTable();
-    setSyncHint('Cloud pull complete ✅');
-  } catch (e) {
-    setSyncHint(`Pull failed: ${e.message}`, 'bad');
-  }
-});
+    $('btnSignOut').addEventListener('click', async ()=>{
+      await supabase.auth.signOut();
+      setHint('Signed out.');
+    });
 
-renderHistory(); renderStats(); renderTable();
+    $('btnMigrateLocal').addEventListener('click', async ()=>{
+      if(!user) return;
+      try { await migrateOldLocal(); }
+      catch(e){ alert(`Migration failed: ${e.message}`); }
+    });
 
-(async function autoPullOnLoad(){
-  const token = ($('syncToken').value || '').trim();
-  if(!token || !$('autoSync').checked) return;
-  try {
-    setSyncHint('Checking cloud on load...');
-    const file = await githubGetFile(token);
-    if(!file){ setSyncHint('No cloud file yet. Add food then auto-sync will create one.'); return; }
-    const txt = decodeURIComponent(escape(atob(file.content.replace(/\n/g,''))));
-    const obj = JSON.parse(txt);
-    S = obj;
-    save(S);
-    $('tCalories').value = S.targets?.calories ?? 1500;
-    $('tProtein').value = S.targets?.protein ?? 100;
-    $('tCarbs').value = S.targets?.carbs ?? '';
-    $('tFat').value = S.targets?.fat ?? '';
-    renderHistory(); renderStats(); renderTable();
-    setSyncHint('Cloud sync loaded ✅');
-  } catch (e) {
-    setSyncHint(`Cloud load failed: ${e.message}`, 'bad');
-  }
-})();
-</script>
+    $('btnLookup').addEventListener('click', async ()=>{
+      const q=$('foodText').value.trim();
+      if(!q) return $('lookupHint').textContent='Type a food first.';
+      $('lookupHint').textContent='Looking up...';
+      try {
+        const m = await lookupFood(q);
+        $('foodText').value=m.name;
+        $('cal').value=m.cal; $('pro').value=m.p; $('carb').value=m.c; $('fat').value=m.f;
+        $('lookupHint').textContent='Found match. Edit if needed, then Add.';
+      } catch {
+        $('lookupHint').textContent='No reliable match. Enter manually.';
+      }
+    });
+
+    $('foodText').addEventListener('input', ()=>{
+      const q=$('foodText').value.trim().toLowerCase();
+      const hit=history.find(h=>h.food_name.toLowerCase()===q);
+      if(hit){ $('cal').value=hit.calories??''; $('pro').value=hit.protein_g??''; $('carb').value=hit.carbs_g??''; $('fat').value=hit.fat_g??''; }
+    });
+
+    $('btnAdd').addEventListener('click', async ()=>{
+      if(!user) return alert('Please sign in first.');
+      try { await addEntry(); }
+      catch(e){ alert(`Add failed: ${e.message}`); }
+    });
+
+    $('btnClear').addEventListener('click', ()=>{
+      $('foodText').value=''; $('cal').value=''; $('pro').value=''; $('carb').value=''; $('fat').value='';
+      $('lookupHint').textContent='Lookup pulls best guess from OpenFoodFacts. Edit before adding if needed.';
+    });
+
+    $('tbody').addEventListener('click', async (ev)=>{
+      const b=ev.target.closest('button[data-del]'); if(!b||!user) return;
+      try { await deleteEntry(b.dataset.del); }
+      catch(e){ alert(`Delete failed: ${e.message}`); }
+    });
+
+    $('date').addEventListener('change', ()=>{ if(user) loadEntries(); });
+    ['tCalories','tProtein','tCarbs','tFat'].forEach(id=>$(id).addEventListener('change', async ()=>{
+      if(!user) return;
+      try { await saveTargets(); }
+      catch(e){ alert(`Save targets failed: ${e.message}`); }
+    }));
+
+    renderStats();
+    boot();
+  </script>
 </body>
 </html>

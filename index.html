@@ -117,6 +117,40 @@
         </table>
       </div>
     </section>
+
+    <section class="card" style="margin-top:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <h3 style="margin:0;">Monday Weigh-In Tracker</h3>
+        <span class="pill" id="weightCount">0 logs</span>
+      </div>
+      <div class="row" style="grid-template-columns:1fr 1fr auto;margin-top:10px;">
+        <div>
+          <label>Weigh-in date</label>
+          <input id="weighDate" type="date" />
+        </div>
+        <div>
+          <label>Weight (lb)</label>
+          <input id="weighValue" type="number" min="0" step="0.1" placeholder="195.6" />
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <button class="btn primary" id="btnAddWeight">Add weigh-in</button>
+        </div>
+      </div>
+      <p class="hint" id="weightHint" style="margin-top:8px;">Tip: add one weigh-in every Monday morning.</p>
+
+      <div style="margin-top:10px;overflow:auto;">
+        <table>
+          <thead>
+            <tr><th>Date</th><th class="right">Weight (lb)</th><th></th></tr>
+          </thead>
+          <tbody id="weightTbody"></tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:12px;">
+        <svg id="weightChart" viewBox="0 0 800 220" width="100%" height="220" style="background:#0d1628;border:1px solid #243149;border-radius:10px;"></svg>
+      </div>
+    </section>
   </div>
 
   <script type="module">
@@ -134,9 +168,11 @@
     let user = null;
     let entries = [];
     let history = [];
+    let weights = [];
     let targets = { calories_target:1500, protein_target:100, carbs_target:null, fat_target:null };
 
     $('date').value = todayISO();
+    $('weighDate').value = todayISO();
 
     function setHint(msg, cls='hint'){ $('syncHint').className=`hint ${cls}`; $('syncHint').textContent=msg; }
     function setAuthHint(msg, cls='hint'){ $('authHint').className=`hint ${cls}`; $('authHint').textContent=msg; }
@@ -249,6 +285,81 @@
       if(error) throw error;
       history = data || [];
       renderHistory();
+    }
+
+    function renderWeights(){
+      $('weightCount').textContent = `${weights.length} log${weights.length===1?'':'s'}`;
+      const tb = $('weightTbody'); tb.innerHTML = '';
+      weights.forEach(w => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${w.weigh_date}</td><td class="right">${round1(w.weight_lb)}</td><td><button class="btn danger" data-wdel="${w.id}">Delete</button></td>`;
+        tb.appendChild(tr);
+      });
+      drawWeightChart();
+    }
+
+    function drawWeightChart(){
+      const svg = $('weightChart');
+      const pts = [...weights].sort((a,b)=>a.weigh_date.localeCompare(b.weigh_date));
+      if(!pts.length){ svg.innerHTML = `<text x="20" y="40" fill="#9ca3af">No weigh-ins yet</text>`; return; }
+
+      const W=800,H=220,p=36;
+      const vals = pts.map(x=>Number(x.weight_lb));
+      const min = Math.min(...vals), max = Math.max(...vals);
+      const range = Math.max(1, max-min);
+      const x = i => p + (i*(W-2*p))/Math.max(1,pts.length-1);
+      const y = v => H-p - ((v-min)/range)*(H-2*p);
+
+      let d = '';
+      pts.forEach((pt,i)=>{ d += `${i?'L':'M'} ${x(i)} ${y(Number(pt.weight_lb))} `; });
+
+      const circles = pts.map((pt,i)=>`<circle cx="${x(i)}" cy="${y(Number(pt.weight_lb))}" r="4" fill="#60a5fa"/><title>${pt.weigh_date}: ${round1(pt.weight_lb)} lb</title>`).join('');
+      const start = pts[0], end = pts[pts.length-1];
+      const delta = Number(end.weight_lb)-Number(start.weight_lb);
+      const deltaTxt = `${delta>0?'+':''}${round1(delta)} lb`;
+
+      svg.innerHTML = `
+        <line x1="${p}" y1="${H-p}" x2="${W-p}" y2="${H-p}" stroke="#334155"/>
+        <line x1="${p}" y1="${p}" x2="${p}" y2="${H-p}" stroke="#334155"/>
+        <path d="${d}" fill="none" stroke="#60a5fa" stroke-width="3"/>
+        ${circles}
+        <text x="${p}" y="20" fill="#9ca3af" font-size="12">Start: ${round1(start.weight_lb)} lb (${start.weigh_date})</text>
+        <text x="${W-p}" y="20" text-anchor="end" fill="#9ca3af" font-size="12">Latest: ${round1(end.weight_lb)} lb (${end.weigh_date}) • Δ ${deltaTxt}</text>
+      `;
+    }
+
+    async function loadWeights(){
+      const { data, error } = await supabase
+        .from('weight_logs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('weigh_date', { ascending:true });
+      if(error) {
+        if(error.message?.toLowerCase().includes('weight_logs')) {
+          $('weightHint').textContent = 'Weight table not found yet. Ask Cal for SQL setup snippet.';
+          return;
+        }
+        throw error;
+      }
+      weights = data || [];
+      renderWeights();
+    }
+
+    async function addWeight(){
+      const weigh_date = $('weighDate').value || todayISO();
+      const weight_lb = n($('weighValue').value);
+      if(!weight_lb) return $('weightHint').textContent = 'Enter a weight first.';
+      const { error } = await supabase.from('weight_logs').insert({ user_id:user.id, weigh_date, weight_lb });
+      if(error) throw error;
+      $('weighValue').value='';
+      $('weightHint').textContent='Weigh-in saved ✅';
+      await loadWeights();
+    }
+
+    async function deleteWeight(id){
+      const { error } = await supabase.from('weight_logs').delete().eq('id', id);
+      if(error) throw error;
+      await loadWeights();
     }
 
     async function upsertHistory(food){
@@ -368,6 +479,7 @@
       await loadTargets();
       await loadHistory();
       await loadEntries();
+      await loadWeights();
     }
 
     async function afterSignIn(sessionUser){
@@ -396,7 +508,8 @@
           user = null;
           $('authSignedOut').style.display='block';
           $('authSignedIn').style.display='none';
-          entries=[]; history=[]; renderTable(); renderHistory(); renderStats();
+          entries=[]; history=[]; weights=[];
+          renderTable(); renderHistory(); renderStats(); renderWeights();
         }
       });
     }
@@ -462,6 +575,18 @@
       catch(e){ alert(`Delete failed: ${e.message}`); }
     });
 
+    $('weightTbody').addEventListener('click', async (ev)=>{
+      const b=ev.target.closest('button[data-wdel]'); if(!b||!user) return;
+      try { await deleteWeight(b.dataset.wdel); }
+      catch(e){ alert(`Delete weigh-in failed: ${e.message}`); }
+    });
+
+    $('btnAddWeight').addEventListener('click', async ()=>{
+      if(!user) return alert('Please sign in first.');
+      try { await addWeight(); }
+      catch(e){ alert(`Save weigh-in failed: ${e.message}`); }
+    });
+
     $('date').addEventListener('change', ()=>{ if(user) loadEntries(); });
     ['tCalories','tProtein','tCarbs','tFat'].forEach(id=>$(id).addEventListener('change', async ()=>{
       if(!user) return;
@@ -470,6 +595,7 @@
     }));
 
     renderStats();
+    renderWeights();
     boot();
   </script>
 </body>

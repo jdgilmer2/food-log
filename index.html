@@ -384,6 +384,13 @@
       await loadHistory();
     }
 
+    function withTimeout(promise, ms=10000){
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out. Please try again.')), ms))
+      ]);
+    }
+
     async function addEntry(){
       const name = $('foodText').value.trim();
       if(!name) return $('lookupHint').textContent='Food name required.';
@@ -401,11 +408,10 @@
       $('btnAdd').disabled = true;
       $('lookupHint').textContent = 'Saving...';
       try {
-        const { data, error } = await supabase
-          .from('food_entries')
-          .insert(row)
-          .select('*')
-          .single();
+        const { data, error } = await withTimeout(
+          supabase.from('food_entries').insert(row).select('*').single(),
+          10000
+        );
         if(error) throw error;
 
         if(data) entries.push(data);

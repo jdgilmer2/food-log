@@ -412,8 +412,10 @@
         renderTable();
         renderStats();
 
-        // History should never block adding food.
-        try { await upsertHistory(row); } catch (e) { console.warn('history upsert failed', e); }
+        // History should never block adding food. Fire-and-forget.
+        Promise.resolve()
+          .then(() => upsertHistory(row))
+          .catch((e) => console.warn('history upsert failed', e));
 
         $('btnClear').click();
         $('lookupHint').textContent='Added ✅';
